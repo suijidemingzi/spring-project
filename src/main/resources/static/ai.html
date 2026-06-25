@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智能AI问诊</title>
+    <script>
+        // 页面加载前安全检查
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        :root{--primary:#165DFF;--success:#00B42A;--danger:#F53F3F;--bg:#F2F3F5;--white:#fff}
+        body{background:var(--bg);height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .header h1{font-size:24px}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none;font-size:16px}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white;padding-bottom:5px}
+        .user{margin-left:auto;font-size:14px;background:rgba(255,255,255,0.15);padding:6px 12px;border-radius:15px;}
+        .main{flex:1;display:flex;padding:30px;gap:30px;overflow:hidden}
+        .chat-container{flex:1;display:flex;flex-direction:column;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+        .chat-header{padding:20px;border-bottom:1px solid #eee;background:linear-gradient(90deg,#165DFF,#0E42B3);color:white}
+        .chat-header h2{font-size:18px}
+        .chat-messages{flex:1;padding:20px;overflow-y:auto;max-height:calc(100vh - 280px)}
+        .message{margin-bottom:20px;display:flex;gap:12px}
+        .message.ai{flex-direction:row}
+        .message.user{flex-direction:row-reverse}
+        .avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+        .avatar.ai{background:var(--primary);color:white}
+        .avatar.user{background:#00B42A;color:white}
+        .message-content{max-width:70%;padding:15px 20px;border-radius:16px;line-height:1.6}
+        .message.ai .message-content{background:#EEF6FF;color:#333;border-radius:0 16px 16px 16px}
+        .message.user .message-content{background:var(--primary);color:white;border-radius:16px 0 16px 16px}
+        .chat-input{padding:20px;border-top:1px solid #eee;display:flex;gap:12px}
+        .chat-input input{flex:1;height:48px;padding:0 20px;border:1px solid #ddd;border-radius:24px;font-size:14px;outline:none;transition:border-color .3s}
+        .chat-input input:focus{border-color:var(--primary)}
+        .chat-input button{width:80px;height:48px;background:var(--primary);color:white;border:none;border-radius:24px;cursor:pointer;font-size:14px}
+        .chat-input button:hover{opacity:.9}
+        .sidebar{width:300px;background:white;border-radius:12px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.1);display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+        .sidebar h3{font-size:16px;margin-bottom:12px;color:#333;border-left:4px solid var(--primary);padding-left:8px}
+        .quick-questions{display:flex;flex-wrap:wrap;gap:10px}
+        .quick-btn{padding:10px 16px;background:#F2F3F5;border:none;border-radius:20px;font-size:13px;color:#666;cursor:pointer;transition:all .3s}
+        .quick-btn:hover{background:#EEF6FF;color:var(--primary)}
+        .dept-list{margin-top:5px}
+        .dept-item{padding:10px 15px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .3s}
+        .dept-item:hover{background:#EEF6FF}
+        .dept-item:last-child{border-bottom:none}
+        .dept-item .name{font-weight:bold;color:#333}
+        .dept-item .desc{font-size:12px;color:#999;margin-top:4px}
+        .typing-indicator{display:flex;gap:4px;padding:10px 20px;background:#EEF6FF;border-radius:0 16px 16px 16px}
+        .typing-dot{width:8px;height:8px;border-radius:50%;background:#165DFF;animation:typing 1.4s infinite ease-in-out}
+        .typing-dot:nth-child(2){animation-delay:.2s}
+        .typing-dot:nth-child(3){animation-delay:.4s}
+        @keyframes typing{0%,80%,100%{opacity:.2}40%{opacity:1}}
+        .welcome-box{text-align:center;padding:40px;color:#666}
+        .welcome-box .icon{font-size:48px;margin-bottom:15px}
+        .welcome-box p{line-height:1.8}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院智能挂号系统</h1>
+    <div class="nav">
+        <a href="index.html">科室挂号</a>
+        <a href="order.html">我的挂号</a>
+        <a href="waiting.html">候诊查询</a>
+        <a href="history.html">就诊历史</a>
+        <a href="profile.html">个人中心</a>
+        <a href="ai.html" class="active">智能问诊</a>
+    </div>
+    <!-- 取消硬编码：改为通过 JS 动态渲染当前登录用户信息 -->
+    <div class="user" id="currentUserDisplay">读取中...</div>
+</div>
+<div class="main">
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>🤖 智能问诊助手</h2>
+            <p style="font-size:14px;margin-top:5px;opacity:.8">我可以帮助您推荐科室、解答就医问题</p>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-box">
+                <div class="icon">💬</div>
+                <h3>您好！我是智能问诊助手</h3>
+                <p>请问您有什么不舒服？<br>或者有什么问题想要咨询？</p>
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="questionInput" placeholder="输入您的问题，如：头痛该挂什么科？" onkeyup="if(event.keyCode===13) sendQuestion()">
+            <button onclick="sendQuestion()">发送</button>
+        </div>
+    </div>
+    <div class="sidebar">
+        <div>
+            <h3>快捷提问</h3>
+            <!-- 取消硬编码：快捷按钮改为由 JS 数据驱动动态生成 -->
+            <div class="quick-questions" id="quickQuestionsBox"></div>
+        </div>
+        <div>
+            <h3>科室导航</h3>
+            <!-- 取消硬编码：科室列表改为优先向后端 API 获取，若获取不到则安全降级到默认数据 -->
+            <div class="dept-list" id="deptListBox"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatMessages = document.getElementById('chatMessages');
+    const questionInput = document.getElementById('questionInput');
+
+    // 1. 初始化登录用户信息
+    function initUserDisplay() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+        const displayEl = document.getElementById("currentUserDisplay");
+        if (userJson && displayEl) {
+            try {
+                const user = JSON.parse(userJson);
+                // 优先展示姓名，其次是用户名，最后是ID
+                const name = user.name || user.username || `患者ID: ${user.id || '--'}`;
+                displayEl.innerText = `当前用户：${name}`;
+            } catch (e) {
+                console.error("解析用户数据失败", e);
+                displayEl.innerText = "未知用户";
+            }
+        }
+    }
+
+    // 2. 初始化快捷提问按钮数据
+    const QUICK_QUESTIONS_DATA = [
+        { label: '头痛', value: '头痛该挂什么科' },
+        { label: '发烧', value: '发烧该挂什么科' },
+        { label: '胃痛', value: '胃痛该挂什么科' },
+        { label: '咳嗽', value: '咳嗽该挂什么科' },
+        { label: '腰痛', value: '腰痛该挂什么科' },
+        { label: '医院地址', value: '医院地址' },
+        { label: '挂号时间', value: '挂号时间' },
+        { label: '如何挂号', value: '如何挂号' },
+        { label: '联系电话', value: '联系电话' },
+        { label: '医保问题', value: '医保' }
+    ];
+
+    function renderQuickQuestions() {
+        const box = document.getElementById("quickQuestionsBox");
+        if (!box) return;
+        box.innerHTML = '';
+        QUICK_QUESTIONS_DATA.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-btn';
+            btn.innerText = item.label;
+            btn.onclick = () => quickAsk(item.value);
+            box.appendChild(btn);
+        });
+    }
+
+    // 3. 动态加载科室导航列表
+    // 为避免后端暂时没有准备好科室查询接口导致前端报错，我们加入了本地备用数据机制
+    const FALLBACK_DEPARTMENTS = [
+        { name: '内科', description: '心血管、呼吸、消化等' },
+        { name: '外科', description: '普通外科、骨科等' },
+        { name: '妇产科', description: '妇科、产科' },
+        { name: '儿科', description: '儿童疾病诊治' },
+        { name: '急诊科', description: '24小时急诊服务' }
+    ];
+
+    async function loadDepartments() {
+        const box = document.getElementById("deptListBox");
+        if (!box) return;
+
+        let departments = [];
+        try {
+            // 尝试请求后端的科室列表接口（可根据后端实际的 Controller 路由地址调整，如 /dept/list 或 /department/list）
+            const res = await fetch('/dept/list');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.code === 200 && Array.isArray(data.data)) {
+                    departments = data.data;
+                }
+            }
+        } catch (e) {
+            console.warn("未能通过 API 获取科室列表，已自动启用默认本地配置显示科室信息", e);
+        }
+
+        // 如果后端 API 请求失败或没有数据，采用备用数据渲染
+        if (departments.length === 0) {
+            departments = FALLBACK_DEPARTMENTS;
+        }
+
+        box.innerHTML = '';
+        departments.forEach(dept => {
+            // 兼容后端接口中字段命名的不同情况（比如是叫 deptName 还是 name）
+            const name = dept.name || dept.deptName || '未命名科室';
+            const desc = dept.description || dept.desc || dept.intro || '';
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'dept-item';
+            itemDiv.onclick = () => quickAsk(name);
+            itemDiv.innerHTML = `
+                <div class="name">${name}</div>
+                <div class="desc">${desc}</div>
+            `;
+            box.appendChild(itemDiv);
+        });
+    }
+
+    // 4. 对话区消息添加
+    function addMessage(content, isUser) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ' + (isUser ? 'user' : 'ai');
+
+        const avatarClass = isUser ? 'user' : 'ai';
+        const avatarText = isUser ? '我' : 'AI';
+
+        messageDiv.innerHTML = `
+            <div class="avatar ${avatarClass}">${avatarText}</div>
+            <div class="message-content">${content.replace(/\n/g, '<br>')}</div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // 5. 显示等待状态
+    function showTyping() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'message ai';
+        typingDiv.innerHTML = `
+            <div class="avatar ai">AI</div>
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        `;
+        chatMessages.appendChild(typingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return typingDiv;
+    }
+
+    // 6. 发送问题给 AI 接口
+    async function sendQuestion() {
+        const question = questionInput.value.trim();
+        if (!question) return;
+
+        questionInput.value = '';
+
+        if (chatMessages.querySelector('.welcome-box')) {
+            chatMessages.innerHTML = '';
+        }
+
+        addMessage(question, true);
+        const typingDiv = showTyping();
+
+        try {
+            const res = await fetch('/ai/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question })
+            });
+
+            const data = await res.json();
+            chatMessages.removeChild(typingDiv);
+
+            if (data.code === 200) {
+                addMessage(data.data, false);
+            } else {
+                addMessage('抱歉，我暂时无法回答您的问题，请稍后再试。', false);
+            }
+        } catch (e) {
+            chatMessages.removeChild(typingDiv);
+            addMessage('网络错误，请检查网络连接后重试。', false);
+        }
+    }
+
+    function quickAsk(question) {
+        questionInput.value = question;
+        sendQuestion();
+    }
+
+    // 7. 页面启动器
+    window.addEventListener('DOMContentLoaded', () => {
+        initUserDisplay();       // 加载用户信息
+        renderQuickQuestions();  // 渲染快捷按钮
+        loadDepartments();       // 加载科室列表
+    });
+</script>
+</body>
+</html>

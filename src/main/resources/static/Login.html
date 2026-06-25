@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 核心修复：添加 UTF-8 编码声明，彻底解决提示词、中文字符乱码问题 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医院挂号系统 - 用户登录</title>
+    <style>
+        /* 统一样式，采用您系统的主题色 #165DFF 和背景色 #F2F3F5 */
+        *{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        body {
+            background: #F2F3F5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* 登录卡片容器 */
+        .login-card {
+            background: #ffffff;
+            width: 380px;
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+        /* 标题部分 */
+        .login-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .login-header h2 {
+            /* 采用与导航栏一致的蓝色渐变 */
+            background: linear-gradient(90deg, #165DFF, #0E42B3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .login-header p {
+            color: #86909C;
+            font-size: 14px;
+        }
+        /* 输入框组合 */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .input-group label {
+            color: #4E5969;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .input-group input {
+            width: 100%;
+            height: 44px;
+            padding: 0 16px;
+            border: 1px solid #E5E6EB;
+            border-radius: 6px;
+            outline: none;
+            font-size: 14px;
+            background: #F9FAFB;
+            transition: all 0.2s ease-in-out;
+        }
+        /* 输入框聚焦效果 */
+        .input-group input:focus {
+            border-color: #165DFF;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.1);
+        }
+        /* 登录按钮 */
+        .login-btn {
+            height: 44px;
+            background: #165DFF;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+        }
+        .login-btn:hover {
+            background: #0E42B3;
+        }
+        .login-btn:active {
+            background: #0C3691;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="login-header">
+        <h2>医院挂号系统</h2>
+        <p>欢迎使用，请登录您的账号</p>
+    </div>
+
+    <!-- 账号输入 -->
+    <div class="input-group">
+        <label for="username">用户名</label>
+        <input type="text" id="username" placeholder="请输入用户名" />
+    </div>
+
+    <!-- 密码输入 -->
+    <div class="input-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" placeholder="请输入密码" />
+    </div>
+
+    <!-- 登录按钮 -->
+    <button class="login-btn" onclick="handleLogin()">登 录</button>
+</div>
+
+<script>
+    async function handleLogin() {
+        const usernameVal = document.getElementById("username").value.trim();
+        const passwordVal = document.getElementById("password").value.trim();
+
+        if(!usernameVal || !passwordVal) {
+            alert("账号或密码不能为空");
+            return;
+        }
+
+        try {
+            // 发送登录请求
+            const response = await fetch('/user/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: usernameVal,
+                    password: passwordVal
+                })
+            });
+            const result = await response.json();
+
+            if (result.code === 200) {
+                alert("登录成功！");
+
+                // 将登录成功的用户信息保存到浏览器的临时缓存中
+                sessionStorage.setItem("user", JSON.stringify(result.data));
+
+                // 登录成功后跳转到主页面
+                window.location.href = "index.html";
+            } else {
+                alert(result.msg || "登录失败");
+            }
+        } catch (error) {
+            console.error("登录异常", error);
+            alert("系统繁忙，请稍后再试");
+        }
+    }
+</script>
+</body>
+</html>

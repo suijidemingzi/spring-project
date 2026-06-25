@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>候诊查询</title>
+    <script>
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        body{background:#F2F3F5;height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white}
+        .container{flex:1;padding:30px}
+        .screen{background:#165DFF;color:white;padding:40px;border-radius:12px;text-align:center;margin-bottom:30px}
+        .waiting-info {
+            font-size: 16px;
+            color: #86909C;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院挂号系统</h1>
+    <div class="nav">
+        <a href="index.html">科室挂号</a>
+        <a href="order.html">我的挂号</a>
+        <a href="waiting.html" class="active">候诊查询</a>
+        <a href="history.html">就诊历史</a>
+        <a href="profile.html">个人中心</a>
+        <a href="ai.html">智能问诊</a>
+    </div>
+</div>
+<div class="container">
+    <div class="screen">
+        <h1 id="deptName">正在载入...</h1>
+        <h2 id="currentCalling">当前叫号：-- 号</h2>
+    </div>
+    <div id="myWait"></div>
+</div>
+<script>
+    function getLoggedInPatientId() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+
+        if (userJson) {
+            try {
+                const user = JSON.parse(userJson);
+                if (user && user.id) {
+                    return user.id;
+                }
+            } catch (e) {
+                console.error("解析本地登录用户数据失败:", e);
+            }
+        }
+        return null;
+    }
+
+    async function load(){
+        const deptNameEl = document.getElementById("deptName");
+        const currentCallingEl = document.getElementById("currentCalling");
+        const myWaitEl = document.getElementById("myWait");
+
+        const patientId = getLoggedInPatientId();
+
+        if (!patientId) {
+            alert("您尚未登录，请先登录系统！");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            const res = await fetch(`/register/queue/${patientId}?_t=${new Date().getTime()}`);
+            const data = await res.json();
+
+            if (data.code !== 200 || !data.data) {
+                deptNameEl.innerText = "暂无候诊诊室";
+                currentCallingEl.innerText = data.msg || "您今天暂无排队";
+                myWaitEl.innerHTML = "";
+                return;
+            }
+
+            const queueInfo = data.data;
+
+            deptNameEl.innerText = `${queueInfo.deptName}叫号中`;
+            currentCallingEl.innerText = `当前叫号：${queueInfo.currentCallingNumber}号`;
+
+            let waitHtml = `<h3>您的排队号：${queueInfo.userQueueNumber}号</h3>`;
+            if (queueInfo.waitingCount !== undefined) {
+                waitHtml += `<div class="waiting-info">您前面还有 <b style="color: #165DFF;">${queueInfo.waitingCount}</b> 人在等待</div>`;
+            }
+            myWaitEl.innerHTML = waitHtml;
+
+        } catch (error) {
+            console.error("加载排队候诊信息失败：", error);
+            deptNameEl.innerText = "网络异常";
+            currentCallingEl.innerText = "加载失败，请刷新重试";
+        }
+    }
+
+    load();
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>科室挂号</title>
+    <script>
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        :root{--primary:#165DFF;--success:#00B42A;--danger:#F53F3F;--bg:#F2F3F5;--white:#fff}
+        body{background:var(--bg);height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .header h1{font-size:24px}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none;font-size:16px}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white;padding-bottom:5px}
+        .user{margin-left:auto}
+        .main{display:flex;flex:1;overflow:hidden}
+        .dept-sidebar{width:240px;background:white;border-right:1px solid #eee}
+        .dept-item{padding:18px 30px;cursor:pointer}
+        .dept-item.active{background:#EEF6FF;color:var(--primary);border-left:4px solid var(--primary)}
+        .content{flex:1;padding:30px;overflow-y:auto}
+        .doctor-card{background:white;border-radius:12px;padding:30px;margin-bottom:20px;display:flex;gap:30px;align-items:center}
+        .doctor-avatar{width:80px;height:80px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:30px}
+        .schedule-box{min-width:280px}
+        .schedule-item{border:1px solid #eee;border-radius:8px;padding:15px;margin-bottom:10px}
+        .register-btn{width:100%;height:45px;background:var(--primary);color:white;border:none;border-radius:6px;cursor:pointer}
+        .result-box{position:fixed;top:90px;right:30px;padding:18px 25px;border-radius:8px;display:none}
+        .result-success{background:#E8FFEA;color:var(--success)}
+        .result-error{background:#FFF2F2;color:var(--danger)}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院挂号系统</h1>
+    <div class="nav">
+        <a href="index.html" class="active">科室挂号</a>
+        <a href="order.html">我的挂号</a>
+        <a href="waiting.html">候诊查询</a>
+        <a href="history.html">就诊历史</a>
+        <a href="profile.html">个人中心</a>
+        <a href="ai.html">智能问诊</a>
+    </div>
+    <!-- 动态渲染就诊人姓名 -->
+    <div class="user" id="userSpan">加载中...</div>
+</div>
+<div class="main">
+    <div class="dept-sidebar">
+        <div class="dept-item active" data-dept="1">内科</div>
+        <div class="dept-item" data-dept="2">外科</div>
+        <div class="dept-item" data-dept="3">妇产科</div>
+        <div class="dept-item" data-dept="4">儿科</div>
+        <div class="dept-item" data-dept="5">骨科</div>
+    </div>
+    <div class="content">
+        <h2 id="deptTitle">内科 - 出诊医生</h2>
+        <div id="doctorList">
+            <!-- 医生列表会通过JS动态生成 -->
+        </div>
+    </div>
+</div>
+<div class="result-box" id="tip"></div>
+
+<script>
+    // 动态获取患者数据
+    function getLoggedInUser() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+        if (userJson) {
+            try { return JSON.parse(userJson); } catch (e) {}
+        }
+        return null;
+    }
+
+    const currentUser = getLoggedInUser();
+
+    // 初始化右上角患者名称
+    if (currentUser) {
+        const patientName = currentUser.realName || currentUser.real_name || "未认证患者";
+        document.getElementById("userSpan").innerText = "就诊人：" + patientName;
+    }
+
+    // 科室-排班映射（和后端scheduleId对应）
+    const deptScheduleMap = {
+        1: [{doctor:"李医生", title:"主任医师", scheduleId:1, fee:50, time:"上午"}],
+        2: [{doctor:"王医生", title:"副主任医师", scheduleId:2, fee:40, time:"上午"}],
+        3: [{doctor:"张医生", title:"主治医师", scheduleId:3, fee:30, time:"上午"}],
+        4: [{doctor:"刘医生", title:"副主任医师", scheduleId:4, fee:45, time:"上午"}],
+        5: [{doctor:"赵医生", title:"主任医师", scheduleId:5, fee:55, time:"上午"}]
+    };
+
+    const deptItems = document.querySelectorAll('.dept-item');
+    const deptTitle = document.getElementById('deptTitle');
+    const doctorList = document.getElementById('doctorList');
+    const tip = document.getElementById("tip");
+
+    // 显示提示
+    function showTip(text, success){
+        tip.innerText = text;
+        tip.className = "result-box " + (success ? "result-success" : "result-error");
+        tip.style.display = "block";
+        setTimeout(()=>tip.style.display="none", 3000);
+    }
+
+    // 加载科室对应的医生和排班
+    function loadDeptDoctors(deptId, deptName){
+        deptTitle.innerText = deptName + " - 出诊医生";
+        const schedules = deptScheduleMap[deptId] || [];
+        let html = "";
+        schedules.forEach(sched => {
+            // 使用当前登录患者的真实ID作为参数
+            const patientId = currentUser ? currentUser.id : null;
+            html += `
+        <div class="doctor-card">
+            <div class="doctor-avatar">${sched.doctor[0]}</div>
+            <div>
+                <h3>${sched.doctor}</h3>
+                <p>${sched.title}</p>
+            </div>
+            <div class="schedule-box">
+                <div class="schedule-item">
+                    <div>${sched.time}</div>
+                    <div>挂号费：${sched.fee}元</div>
+                    <button class="register-btn" onclick="goRegister(${patientId}, ${sched.scheduleId})">立即挂号</button>
+                </div>
+            </div>
+        </div>`;
+        });
+        doctorList.innerHTML = html || "<p>暂无出诊医生</p>";
+    }
+
+    // 挂号接口调用
+    async function goRegister(patientId, scheduleId){
+        if (!patientId) {
+            showTip("❌ 您尚未登录，无法挂号", false);
+            return;
+        }
+        if (!scheduleId || isNaN(scheduleId)) {
+            showTip("❌ 号源参数错误", false);
+            return;
+        }
+        try{
+            const res = await fetch(`/register/submit/${patientId}/${scheduleId}`, {method:"POST"});
+            const data = await res.json();
+            if(data.code === 200){
+                showTip("✅ 挂号成功："+data.data, true);
+            }else{
+                showTip("❌ 挂号失败："+data.msg, false);
+            }
+        }catch(e){
+            showTip("网络错误："+e.message, false);
+        }
+    }
+
+    // 科室点击事件绑定
+    deptItems.forEach(item => {
+        item.addEventListener('click', () => {
+            // 切换激活状态
+            deptItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            // 加载对应科室的医生
+            const deptId = parseInt(item.dataset.dept);
+            const deptName = item.innerText;
+            loadDeptDoctors(deptId, deptName);
+        });
+    });
+
+    // 页面初始化加载内科医生
+    loadDeptDoctors(1, "内科");
+</script>
+</body>
+</html>

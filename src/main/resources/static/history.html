@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>就诊历史</title>
+    <script>
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        body{background:#F2F3F5;height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white}
+        .container{flex:1;padding:30px}
+        .card{background:white;border-radius:12px;padding:25px;margin-bottom:20px}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院挂号系统</h1>
+    <div class="nav">
+        <a href="index.html">科室挂号</a>
+        <a href="order.html">我的挂号</a>
+        <a href="waiting.html">候诊查询</a>
+        <a href="history.html" class="active">就诊历史</a>
+        <a href="profile.html">个人中心</a>
+        <a href="ai.html">智能问诊</a>
+    </div>
+</div>
+<div class="container" id="historyList">正在载入历史就诊记录...</div>
+
+<script>
+    // 动态获取登录患者信息
+    function getLoggedInUser() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+        if (userJson) {
+            try { return JSON.parse(userJson); } catch (e) {}
+        }
+        return null;
+    }
+
+    // 科室 ID 到名称的映射
+    const deptNames = { 1: "内科", 2: "外科", 3: "妇产科", 4: "儿科", 5: "骨科" };
+
+    async function load(){
+        const user = getLoggedInUser();
+        if (!user || !user.id) {
+            alert("您尚未登录，请先登录系统！");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            // 调用我的挂号历史接口
+            const res = await fetch(`/register/myOrder/${user.id}`);
+            const data = await res.json();
+            const list = document.getElementById("historyList");
+            let html = "";
+
+            if (data.code === 200 && data.data && data.data.length > 0) {
+                // 仅筛选出 orderStatus === 2 (已就诊) 的订单记录
+                const historyOrders = data.data.filter(o => o.orderStatus === 2);
+
+                historyOrders.forEach(o => {
+                    const deptName = deptNames[o.deptId] || "未知科室";
+                    html += `<div class="card">${o.scheduleDate} ${deptName} 已就诊</div>`;
+                });
+
+                list.innerHTML = html || "暂无就诊历史";
+            } else {
+                list.innerHTML = "暂无就诊历史";
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById("historyList").innerText = "加载失败，请重试";
+        }
+    }
+    load();
+</script>
+</body>
+</html>

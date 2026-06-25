@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>我的挂号</title>
+    <script>
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        :root{--primary:#165DFF;--success:#00B42A;--danger:#F53F3F;--bg:#F2F3F5;--white:#fff}
+        body{background:var(--bg);height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white;padding-bottom:5px}
+        .user{margin-left:auto}
+        .container{flex:1;padding:30px;overflow-y:auto}
+        .order-card{background:white;border-radius:12px;padding:25px;margin-bottom:20px}
+        .btn-cancel{background:var(--danger);color:white;border:none;padding:10px 16px;border-radius:6px;cursor:pointer}
+        .result-box{position:fixed;top:90px;right:30px;padding:18px 25px;border-radius:8px;display:none}
+        .result-success{background:#E8FFEA;color:var(--success)}
+        .result-error{background:#FFF2F2;color:var(--danger)}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院智能挂号系统</h1>
+    <div class="nav">
+        <a href="index.html">科室挂号</a>
+        <a href="order.html" class="active">我的挂号</a>
+        <a href="waiting.html">候诊查询</a>
+        <a href="history.html">就诊历史</a>
+        <a href="profile.html">个人中心</a>
+        <a href="ai.html">智能问诊</a>
+    </div>
+    <!-- 1. 将写死的 ID 改为带有 id 的展示框，方便 JS 动态注入 -->
+    <div class="user" id="userDisplay">加载中...</div>
+</div>
+<div class="container" id="orderList"></div>
+<div class="result-box" id="tip"></div>
+
+<script>
+    // 2. 动态获取本地缓存中登录的用户对象（不硬编码）
+    function getLoggedInUser() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+        if (userJson) {
+            try { return JSON.parse(userJson); } catch (e) {}
+        }
+        return null;
+    }
+
+    const currentUser = getLoggedInUser();
+
+    // 初始化右上角登录用户信息
+    if (currentUser) {
+        const patientName = currentUser.realName || currentUser.real_name || "未认证患者";
+        document.getElementById("userDisplay").innerText = "就诊人：" + patientName;
+    }
+
+    // 科室 ID 到科室名称的映射
+    const deptNames = { 1: "内科", 2: "外科", 3: "妇产科", 4: "儿科", 5: "骨科" };
+
+    const tip = document.getElementById("tip");
+
+    function showTip(text, ok){
+        tip.innerText = text;
+        tip.className = "result-box "+(ok?"result-success":"result-error");
+        tip.style.display="block";
+        setTimeout(()=>tip.style.display="none",3000);
+    }
+
+    async function loadOrders(){
+        if (!currentUser || !currentUser.id) {
+            alert("您尚未登录，请先登录系统！");
+            window.location.href = "login.html";
+            return;
+        }
+
+        const list = document.getElementById("orderList");
+        list.innerHTML = "加载中...";
+        try{
+            // 3. 将接口路径中的写死 ID 1，更换为动态登录用户的真实 id
+            const res = await fetch(`/register/myOrder/${currentUser.id}`);
+            const data = await res.json();
+
+            if(data.code !== 200 || !data.data || data.data.length === 0){
+                list.innerHTML = "<h3>暂无挂号记录</h3>";
+                return;
+            }
+            let html = "";
+            data.data.forEach(o=>{
+                let status = "";
+                if(o.orderStatus===1) status="待就诊";
+                if(o.orderStatus===2) status="已就诊";
+                if(o.orderStatus===3) status="已取消";
+
+                // 4. 将写死的“科室：内科”替换为根据 deptId 动态映射的名称
+                const deptName = deptNames[o.deptId] || "未知科室";
+
+                const cancelBtn = o.orderStatus === 1
+                    ? `<button class="btn-cancel" onclick="cancelOrder(${o.id})">取消挂号</button>`
+                    : "";
+
+                html += `
+            <div class="order-card">
+                <div>订单号：${o.orderNo}</div>
+                <div>科室：${deptName}</div>
+                <div>就诊时间：${o.scheduleDate}</div>
+                <div>挂号费：${o.registerFee}元</div>
+                <div>状态：${status}</div>
+                ${cancelBtn}
+            </div>`;
+            });
+            list.innerHTML = html;
+        }catch(e){
+            list.innerHTML = "加载失败："+e.message;
+        }
+    }
+
+    async function cancelOrder(orderId){
+        // 校验数字ID，避免字符串/undefined
+        if (!orderId || isNaN(orderId)) {
+            showTip("❌ 订单ID无效", false);
+            return;
+        }
+        try{
+            const res = await fetch(`/register/cancel/${orderId}`, {method:"POST"});
+            const data = await res.json();
+            if(data.code === 200){
+                showTip("✅ 取消挂号成功", true);
+                loadOrders(); // 刷新列表
+            }else{
+                showTip("❌ "+data.msg, false);
+            }
+        }catch(e){
+            showTip("❌ 请求失败："+e.message, false);
+        }
+    }
+
+    // 页面初始化加载订单
+    loadOrders();
+</script>
+</body>
+</html>

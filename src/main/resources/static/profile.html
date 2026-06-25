@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>个人中心</title>
+    <script>
+        (function() {
+            const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+                || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+            if (!userJson) {
+                alert("您尚未登录，请先登录系统！");
+                window.location.href = "login.html"; // 强制退回登录页
+            }
+        })();
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei}
+        body{background:#F2F3F5;height:100vh;display:flex;flex-direction:column}
+        .header{height:70px;background:linear-gradient(90deg,#165DFF,#0E42B3);display:flex;align-items:center;padding:0 40px;color:white}
+        .nav{margin-left:50px;display:flex;gap:35px}
+        .nav a{color:rgba(255,255,255,.8);text-decoration:none}
+        .nav a.active{color:white;font-weight:bold;border-bottom:3px solid white}
+        .container{flex:1;padding:30px}
+        .card{background:white;border-radius:12px;padding:30px}
+        .card p{font-size: 16px; margin-top: 15px; color: #4E5969;}
+        .logout-btn{margin-top:25px;width:120px;height:40px;background:#F53F3F;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>医院挂号系统</h1>
+    <div class="nav">
+        <a href="index.html">科室挂号</a>
+        <a href="order.html">我的挂号</a>
+        <a href="waiting.html">候诊查询</a>
+        <a href="history.html">就诊历史</a>
+        <a href="profile.html" class="active">个人中心</a>
+        <a href="ai.html">智能问诊</a>
+    </div>
+</div>
+<div class="container">
+    <div class="card" id="profileCard">
+        加载个人资料中...
+    </div>
+</div>
+
+<script>
+    function getLoggedInUser() {
+        const userJson = sessionStorage.getItem("user") || localStorage.getItem("user")
+            || sessionStorage.getItem("userInfo") || localStorage.getItem("userInfo");
+        if (userJson) {
+            try { return JSON.parse(userJson); } catch (e) {}
+        }
+        return null;
+    }
+
+    // 根据身份证第17位提取性别 (奇数为男，偶数为女)
+    function extractGender(idCard) {
+        if (!idCard || idCard.length !== 18) return "未登记";
+        const genderCode = parseInt(idCard.charAt(16));
+        return (genderCode % 2 === 0) ? "女" : "男";
+    }
+
+    // 退出登录逻辑
+    function logout(){
+        if(confirm("确定要退出登录吗？")){
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = "login.html";
+        }
+    }
+
+    function renderProfile() {
+        const user = getLoggedInUser();
+        const card = document.getElementById("profileCard");
+        if (!user) {
+            card.innerHTML = "<p>未查询到登录状态，请重新登录</p>";
+            return;
+        }
+
+        const userId = user.id;
+        const realName = user.realName || user.real_name || "未填写";
+        const idCard = user.idCard || user.id_card || "";
+        const phone = user.phone || "未登记";
+        const gender = extractGender(idCard);
+
+        card.innerHTML = `
+            <h2>患者账号 ID：${userId}</h2>
+            <p><strong>真实姓名：</strong>${realName}</p>
+            <p><strong>性别：</strong>${gender}</p>
+            <p><strong>手机号：</strong>${phone}</p>
+            <p><strong>身份证号：</strong>${idCard ? idCard.replace(/^(.{6})(?:\d+)(.{4})$/, "$1******$2") : "未绑定"}</p>
+            <button class="logout-btn" onclick="logout()">退出登录</button>
+        `;
+    }
+
+    renderProfile();
+</script>
+</body>
+</html>
