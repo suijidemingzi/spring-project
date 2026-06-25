@@ -8,5 +8,5 @@ RUN mvn clean package -DskipTests
 FROM openjdk:17-jdk-slim
 COPY --from=build /target/*.jar app.jar
 # 暴露端口，Render 会自动分配 PORT 环境变量
-EXPOSE 8080
+EXPOSE 8081
 ENTRYPOINT ["java","-jar","/app.jar"]
